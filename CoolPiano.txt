@@ -1,0 +1,334 @@
+#include <Windows.h>
+#include <WindowsX.h>
+//#include <stdio.h>
+
+#define WS_MAINWINDOW ((WS_OVERLAPPEDWINDOW | WS_VISIBLE) & ~(WS_SIZEBOX | WS_MAXIMIZEBOX))
+
+#define KEY_FIRST     48
+#define KEY_LAST      81
+
+#define WHITE_WIDTH   46
+#define WHITE_HEIGHT  290
+#define BLACK_WIDTH   30
+#define BLACK_HEIGHT  170
+
+#define COLOR_WHITE   0
+#define COLOR_BLACK   1
+
+#define IS_BLACK(n) (0x54A & (1 << ((n) % 12)))
+
+typedef unsigned char MIDIKEY;
+
+#define KEY_NONE      0xFF
+
+const wchar_t* const MainWindowClass = L"CoolPiano";
+const MIDIKEY keyMap[256] = {
+	//     0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x50, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 0
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 1
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 2
+		0x4B, 0xFF, 0x3D, 0x3F, 0xFF, 0x42, 0x44, 0x46, 0xFF, 0x49, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 3
+		0xFF, 0xFF, 0x37, 0x34, 0x33, 0x40, 0xFF, 0x36, 0x38, 0x48, 0x3A, 0xFF, 0x3D, 0x3B, 0x39, 0x4A,	// 4
+		0x4C, 0x3C, 0x41, 0x31, 0x43, 0x47, 0x35, 0x3E, 0x32, 0x45, 0x30, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 5
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 6
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 7
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 8
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 9
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// A
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x3F, 0x4E, 0x3C, 0xFF, 0x3E, 0x40,	// B
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// C
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x4D, 0x51, 0x4F, 0xFF, 0xFF,	// D
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// E
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF	// F
+};
+
+HMIDIOUT hMidiOut;
+HPEN     hpBorder;
+HBRUSH   hbrWhiteNormal, hbrBlackNormal, hbrWhitePressed, hbrBlackPressed;
+
+HDC      hdcBack;
+HBITMAP  hbmBack;
+RECT     rcClient;
+
+RECT     rcKeys[128];
+BOOL     keyState[128];
+MIDIKEY  mkMouse = KEY_NONE;
+
+void InitializeBackBuffer(HWND hWnd, int w, int h)
+{
+	HDC hdcWindow;
+
+	hdcWindow = GetDC(hWnd);
+
+	hdcBack = CreateCompatibleDC(hdcWindow);
+	hbmBack = CreateCompatibleBitmap(hdcWindow, w, h);
+	SaveDC(hdcBack);
+	SelectObject(hdcBack, hbmBack);
+
+	ReleaseDC(hWnd, hdcWindow);
+}
+
+void FinalizeBackBuffer()
+{
+	if (hdcBack)
+	{
+		RestoreDC(hdcBack, -1);
+		DeleteObject(hbmBack);
+		DeleteDC(hdcBack);
+		hdcBack = 0;
+	}
+}
+
+// pKeyRects should be an array with at least mkLast + 1 element.
+void CalcKeyRects(RECT* pKeyRects, MIDIKEY mkFirst, MIDIKEY mkLast, RECT* prcSize)
+{
+	RECT rcWhite, rcBlack;
+	MIDIKEY key;
+
+	if (IS_BLACK(mkFirst))
+		mkFirst--;
+	if (IS_BLACK(mkLast))
+		mkLast++;
+
+	SetRect(&rcWhite, 0, 0, WHITE_WIDTH, WHITE_HEIGHT);
+	SetRect(&rcBlack, -BLACK_WIDTH / 2, 0, BLACK_WIDTH / 2, BLACK_HEIGHT);
+
+	for (key = mkFirst; key <= mkLast; key++)
+	{
+		if (IS_BLACK(key))
+		{
+			CopyRect(&pKeyRects[key], &rcBlack);
+		}
+		else
+		{
+			CopyRect(&pKeyRects[key], &rcWhite);
+			OffsetRect(&rcWhite, WHITE_WIDTH, 0);
+			OffsetRect(&rcBlack, WHITE_WIDTH, 0);
+		}
+	}
+
+	if (prcSize)
+	{
+		SetRect(prcSize, 0, 0, pKeyRects[mkLast].right, pKeyRects[mkLast].bottom);
+	}
+}
+
+MIDIKEY PointToKey(const RECT* pKeyRects, MIDIKEY mkFirst, MIDIKEY mkLast, int x, int y)
+{
+	MIDIKEY key;
+	int color;
+	POINT pt;
+
+	mkFirst -= !!IS_BLACK(mkFirst);
+	mkLast += !!IS_BLACK(mkLast);
+
+	pt.x = x;
+	pt.y = y;
+
+	for (color = COLOR_BLACK; color >= COLOR_WHITE; color--)
+	{
+		for (key = mkFirst; key <= mkLast; key++)
+		{
+			if (color ^ !IS_BLACK(key))
+			{
+				if (PtInRect(&pKeyRects[key], pt))
+					return key;
+			}
+		}
+	}
+	return KEY_NONE;
+}
+
+void DrawPiano(HDC hdc, const RECT* pKeyRects, MIDIKEY mkFirst, MIDIKEY mkLast)
+{
+	MIDIKEY key;
+	int color;
+
+	mkFirst -= !!IS_BLACK(mkFirst);
+	mkLast += !!IS_BLACK(mkLast);
+
+	SaveDC(hdc);
+	SelectObject(hdc, hpBorder);
+
+	for (color = COLOR_WHITE; color <= COLOR_BLACK; color++)
+	{
+		for (key = mkFirst; key <= mkLast; key++)
+		{
+			if (color ^ !IS_BLACK(key))
+			{
+				if (COLOR_WHITE == color)
+				{
+					SelectObject(hdc, keyState[key] ? hbrWhitePressed : hbrWhiteNormal);
+				}
+				else
+				{
+					SelectObject(hdc, keyState[key] ? hbrBlackPressed : hbrBlackNormal);
+				}
+				Rectangle(hdc, pKeyRects[key].left, pKeyRects[key].top,
+					pKeyRects[key].right, pKeyRects[key].bottom);
+			}
+		}
+	}
+	RestoreDC(hdc, -1);
+}
+
+LRESULT CALLBACK MainWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	PAINTSTRUCT ps;
+	HDC hdc;
+	int x, y;
+	MIDIKEY key;
+
+	//	wchar_t szBuf[3];
+
+	switch (uMsg)
+	{
+	case WM_SIZE:
+		GetClientRect(hWnd, &rcClient);
+		FinalizeBackBuffer();
+		InitializeBackBuffer(hWnd, rcClient.right, rcClient.bottom);
+	case WM_KILLFOCUS:
+		mkMouse = KEY_NONE;
+		memset(keyState, 0, sizeof keyState);
+		midiOutShortMsg(hMidiOut, 0x007BB0);
+		InvalidateRect(hWnd, NULL, TRUE); // &rcKeys[key]
+		break;
+	case WM_ERASEBKGND:
+		return TRUE;
+	case WM_PAINT:
+		DrawPiano(hdcBack, rcKeys, KEY_FIRST, KEY_LAST);
+
+		hdc = BeginPaint(hWnd, &ps);
+		BitBlt(hdc, 0, 0, rcClient.right, rcClient.bottom, hdcBack, 0, 0, SRCCOPY);
+		EndPaint(hWnd, &ps);
+		break;
+	case WM_LBUTTONDOWN:
+		x = GET_X_LPARAM(lParam);
+		y = GET_Y_LPARAM(lParam);
+		key = PointToKey(rcKeys, KEY_FIRST, KEY_LAST, x, y);
+		if (KEY_NONE != key)	// TODO: Replace with a macro, e.g. IsValidKey
+		{
+			mkMouse = key;
+			keyState[key] = TRUE;
+			midiOutShortMsg(hMidiOut, 0x7F0090 | ((int)key << 8));
+			SetCapture(hWnd);
+			InvalidateRect(hWnd, NULL, TRUE); // &rcKeys[key]
+		}
+		break;
+	case WM_LBUTTONUP:
+		key = mkMouse;
+		if (KEY_NONE != key)	// TODO: Replace with a macro, e.g. IsValidKey
+		{
+			mkMouse = KEY_NONE;
+			keyState[key] = FALSE;
+			midiOutShortMsg(hMidiOut, 0x7F0080 | ((int)key << 8));
+			ReleaseCapture();
+			InvalidateRect(hWnd, NULL, TRUE); // &rcKeys[key]
+		}
+		break;
+	case WM_MOUSEMOVE:
+		if (KEY_NONE == mkMouse)
+			break;
+		x = GET_X_LPARAM(lParam);
+		y = GET_Y_LPARAM(lParam);
+		key = PointToKey(rcKeys, KEY_FIRST, KEY_LAST, x, y);
+		if (KEY_NONE != key && mkMouse != key)
+		{
+			keyState[mkMouse] = FALSE;
+			midiOutShortMsg(hMidiOut, 0x7F0080 | ((int)mkMouse << 8));
+
+			mkMouse = key;
+
+			keyState[key] = TRUE;
+			midiOutShortMsg(hMidiOut, 0x7F0090 | ((int)key << 8));
+
+			InvalidateRect(hWnd, NULL, TRUE); // &rcKeys[key]
+		}
+		break;
+	case WM_SYSCOMMAND:
+		if (SC_KEYMENU == (wParam & 0xFFF0))
+			return 0;
+		break;
+	case WM_SYSKEYDOWN:
+	case WM_KEYDOWN:
+		//		swprintf(szBuf, sizeof szBuf, L"%02X", wParam);
+		//		SetWindowText(hWnd, szBuf);
+		if (wParam <= 255 && !(lParam & 0x40000000))
+		{
+			key = keyMap[wParam];
+			if (KEY_NONE != key)	// TODO: Replace with a macro, e.g. IsValidKey
+			{
+				keyState[key] = TRUE;
+				midiOutShortMsg(hMidiOut, 0x7F0090 | ((int)key << 8));
+				InvalidateRect(hWnd, NULL, TRUE); // &rcKeys[key]
+			}
+		}
+		break;
+	case WM_SYSKEYUP:
+	case WM_KEYUP:
+		if (wParam <= 255)
+		{
+			key = keyMap[wParam];
+			if (KEY_NONE != key && keyState[key])	// TODO: Replace with a macro, e.g. IsValidKey
+			{
+				keyState[key] = FALSE;
+				midiOutShortMsg(hMidiOut, 0x7F0080 | ((int)key << 8));
+				InvalidateRect(hWnd, NULL, TRUE); // &rcKeys[key]
+			}
+		}
+		break;
+	case WM_DESTROY:
+		FinalizeBackBuffer();
+		PostQuitMessage(0);
+		break;
+	}
+	return DefWindowProc(hWnd, uMsg, wParam, lParam);
+}
+
+//Дескриптор экземпляра программы   Не нужен    Параметр командной строки   Свернуть, развернуть..
+INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+	WNDCLASSEX wcex;
+	HWND hwndMain;
+	MSG msg;
+	RECT rcWindow;
+
+	memset(&wcex, 0, sizeof wcex);
+	wcex.cbSize = sizeof wcex;
+	wcex.style = CS_GLOBALCLASS;
+	wcex.lpfnWndProc = MainWindowProc;
+	wcex.hCursor = LoadCursor(0, IDC_HAND);
+	wcex.hbrBackground = 0; //(HBRUSH)(COLOR_HIGHLIGHT + 1);
+	wcex.lpszClassName = MainWindowClass;
+	RegisterClassEx(&wcex);
+
+	CalcKeyRects(rcKeys, KEY_FIRST, KEY_LAST, &rcWindow);
+	AdjustWindowRect(&rcWindow, WS_MAINWINDOW, FALSE);
+	OffsetRect(&rcWindow, -rcWindow.left, -rcWindow.top);
+
+	hpBorder = CreatePen(PS_SOLID, 0, 0x000000);
+	hbrWhiteNormal = CreateSolidBrush(0xFFFFFF);
+	hbrBlackNormal = CreateSolidBrush(RGB(0, 0, 0)); // Just another way to pass color
+	hbrWhitePressed = CreateSolidBrush(0xCCCCCC);
+	hbrBlackPressed = CreateSolidBrush(0x555555);
+
+	hwndMain = CreateWindowEx(0, MainWindowClass, L"CoolPiano 2022", WS_MAINWINDOW,
+		rcWindow.left, rcWindow.top, rcWindow.right, rcWindow.bottom, 0, 0, 0, NULL);
+
+	midiOutOpen(&hMidiOut, MIDI_MAPPER, 0, 0, CALLBACK_NULL);
+	//midiOutShortMsg(hMidiOut, 0x0030C0);
+
+	while (GetMessage(&msg, 0, 0, 0))
+	{
+		DispatchMessage(&msg);
+	}
+
+	midiOutClose(hMidiOut);
+
+	DeleteObject(hbrBlackPressed);
+	DeleteObject(hbrWhitePressed);
+	DeleteObject(hbrBlackNormal);
+	DeleteObject(hbrWhiteNormal);
+	DeleteObject(hpBorder);
+	return msg.wParam;
+}

@@ -1,0 +1,94 @@
+program Project4;
+
+{$APPTYPE CONSOLE}
+
+uses
+SysUtils;
+const n=10;
+r=10;
+var mas:array [1..n] of integer;
+i,j,k,m,a,x,povt,min,poz:integer;
+begin
+
+{randomize;
+for i:=1 to n do begin
+mas[i]:=random(r);
+write(inttostr(mas[i]) + ' ');
+end;
+writeln(''); }
+
+for i:=1 to n do
+readln(mas[i]);
+for i:=1 to n do
+write(inttostr(mas[i]) + ' ');
+writeln('');
+
+poz:=1;
+i:=1;
+min:=1;
+
+while poz<n do begin
+  povt:=0;
+
+  for j:=poz to n do
+    if mas[i]=mas[j] then
+      povt:=povt+1;
+
+
+  if povt=min then begin
+    x:=mas[i];
+
+      for j:=1 to povt do begin
+
+        if i=poz then begin
+          poz:=poz+1;
+
+          if j<povt then begin
+            m:=i+1;
+            while m<>i do begin
+              if mas[m]=x then
+                i:=m
+              else
+                m:=m+1;
+            end;
+          end;
+
+        end
+        else begin
+
+          for k:=i downto poz+1 do begin
+            a:=mas[k];
+            mas[k]:=mas[k-1];
+            mas[k-1]:=a;
+          end;
+          poz:=poz+1;
+
+          if j<povt then begin
+            m:=i+1;
+            while m<>i do begin
+              if mas[m]=x then
+                i:=m
+              else
+                m:=m+1;
+            end;
+          end;
+        end;
+      end;
+    i:=poz;
+  end
+
+  else
+    i:=i+1;
+
+  if i=n+1 then begin
+    i:=poz;
+    min:=min+1;
+  end;
+
+end;
+
+for i:=1 to n do
+write(inttostr(mas[i]) + ' ');
+
+readln;
+end.

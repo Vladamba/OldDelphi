@@ -1,0 +1,58 @@
+program Project21;
+
+{$APPTYPE CONSOLE}
+
+uses
+  SysUtils;
+type
+  tmas=array of integer;
+  tbool=array of boolean;
+var
+  num,i:integer;
+  flag:boolean;
+  mas,mas1:tmas;
+  bool:tbool;
+
+procedure loop(m:tmas; var m1:tmas; var b:tbool; n:integer; var f:boolean; var s:integer);
+var
+  i:integer;
+begin
+  for i:=0 to high(m) do begin
+    if b[i]=true then begin
+      b[i]:=false;
+      m1[n]:=m[i];
+      f:=true;
+      loop(m,m1,b,n+1,f,s);
+      f:=false;
+      b[i]:=true;
+    end;
+  end;
+  if f then begin
+    s:=s+1;
+    write(s,') ');
+    for i:=0 to high(m) do
+      write(m1[i],' ');
+    writeln;
+  end;
+end;
+
+begin
+  write('Input the length of the array: ');
+  readln(num);
+  while num<1 do begin
+    write('Impossible! Try again:');
+    readln(num);
+  end;
+    setlength(mas,num);
+    setlength(mas1,num);
+    setlength(bool,num);
+    for i:=0 to high(mas) do begin
+      mas[i]:=i+1;
+      mas1[i]:=i+1;
+      bool[i]:=true;
+    end;
+    num:=0;
+    flag:=false;
+    loop(mas,mas1,bool,num,flag,num);
+  readln;
+end.

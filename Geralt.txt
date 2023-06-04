@@ -1,0 +1,353 @@
+unit Unit1;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, ExtCtrls, MPlayer;
+
+type
+  TForm1 = class(TForm)
+    Timer1: TTimer;
+    MediaPlayer1: TMediaPlayer;
+    procedure FormCreate(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+    procedure FormKeyUp(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+uses
+  LocationUnit;
+
+{$R *.dfm}
+type
+  TLocation=record
+    StartPoint:TPoint;
+    FinalPoint:TPoint;
+    Block:array [1..10,1..20] of Byte;
+  end;
+var
+  Geralt,Sky,Ground,Lava,Buffer:TBitmap;
+  LeftMove,RightMove,Jump,Landing,Start:Boolean;
+  GeraltX,GeraltY,GeraltMove,GeraltJump,JumpStart,JumpHeight,LocationNumber,MaxLocation:integer;
+  Location:TLocation;
+  LocationFile:File of TLocation;
+
+function FindMaxLocation:integer;
+begin
+  AssignFile(LocationFile,'Data/Location.txt');
+  Reset(LocationFile);
+  Result:=0;
+  while not Eof(LocationFile) do begin
+    Result:=Result+1;
+    Read(LocationFile,Location);
+  end;
+  CloseFile(LocationFile);
+end;
+
+
+procedure ReadLocation(Number:integer);
+begin
+  Reset(LocationFile);
+  Seek(LocationFile,Number-1);
+  Read(LocationFile,Location);
+  CloseFile(LocationFile);
+
+  if Start then begin
+    GeraltX:=Location.StartPoint.X;
+    GeraltY:=Location.StartPoint.Y;
+  end else begin
+    GeraltX:=Location.FinalPoint.X;
+    GeraltY:=Location.FinalPoint.Y;
+  end;
+  JumpStart:=GeraltY;
+  Jump:=False;
+end;
+
+
+procedure DrawLocation;
+var
+  i,j:integer;
+begin
+  Buffer.Canvas.Draw(0,0,Sky);
+  for i:=1 to 10 do begin
+    for j:=1 to 20 do begin
+      case Location.Block[i,j] of
+        1: Buffer.Canvas.Draw(j*50-50,i*50-50,Ground);
+        2: Buffer.Canvas.Draw(j*50-50,i*50-50,Lava);
+      end;
+    end;
+  end;
+end;
+
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  LocationUnit.CreateLocations;
+  DoubleBuffered:=True;
+
+  Sky:=TBitmap.Create;
+  Sky.LoadFromFile('Data/Sky.bmp');
+  Ground:=TBitmap.Create;
+  Ground.LoadFromFile('Data/Ground.bmp');
+  Lava:=TBitmap.Create;
+  Lava.LoadFromFile('Data/Lava.bmp');
+
+  Geralt:=TBitmap.Create;
+  Geralt.Transparent:=true;
+  Geralt.LoadFromFile('Data/Geralt.bmp');
+
+  Buffer:=TBitmap.Create;
+  Buffer.Width:=1000;
+  Buffer.Height:=500;
+
+  MaxLocation:=FindMaxLocation;
+  LocationNumber:=1;
+  Start:=True;
+  ReadLocation(LocationNumber);
+
+  GeraltMove:=5;
+  GeraltJump:=5;
+  JumpHeight:=100;
+
+  LeftMove:=False;
+  RightMove:=False;
+  Landing:=False;
+
+  with MediaPlayer1 do begin
+    FileName:='Data/GeraltLavaSound.mp3';
+    Open;
+  end;
+
+  Timer1.Enabled:=True;
+end;
+
+procedure LavaTouch;
+begin
+  Form1.MediaPlayer1.Play;
+  LocationNumber:=1;
+  Start:=True;
+  ReadLocation(LocationNumber);
+  Form1.Timer1.Enabled:=True;
+end;
+
+////////////////////////////////////////////////////////////////////////////////
+
+function LeftMovePossible:Boolean;
+var
+  i,j,k:integer;
+begin
+  Result:=True;
+  if (GeraltX-GeraltMove<0) and (LocationNumber=1) then begin
+    Result:=False;
+    Exit;
+  end;
+  if (GeraltX-GeraltMove<0) and (LocationNumber<>1) then begin
+    Start:=False;
+    LocationNumber:=LocationNumber-1;
+    ReadLocation(LocationNumber);
+    Exit;
+  end;
+  if ((GeraltX-GeraltMove) mod 50)=45 then begin
+    j:=((GeraltX-GeraltMove) div 50)+1;
+    if GeraltY mod 50=0 then
+      k:=2
+    else
+      k:=3;
+    for i:=(GeraltY div 50)+1 to (GeraltY div 50)+1+k do begin
+      if Location.Block[i,j]=2 then begin
+        Result:=False;
+        Form1.Timer1.Enabled:=False;
+        LavaTouch;
+        Exit;
+      end;
+      if Location.Block[i,j]=1 then begin
+        Result:=False;
+        Exit;
+      end;
+    end;
+  end;
+end;
+
+
+function RightMovePossible:Boolean;
+var
+  i,j,k:integer;
+begin
+  Result:=True;
+  if (GeraltX+GeraltMove+50>1000) and (LocationNumber=MaxLocation) then begin
+    Result:=False;
+    Exit;
+  end;
+  if (GeraltX+GeraltMove+50>1000) and (LocationNumber<>MaxLocation) then begin
+    Start:=True;
+    LocationNumber:=LocationNumber+1;
+    ReadLocation(LocationNumber);
+    Exit;
+  end;
+  if ((GeraltX+GeraltMove) mod 50)=5 then begin
+    j:=((GeraltX+GeraltMove) div 50)+2;
+    if GeraltY mod 50=0 then
+      k:=2
+    else
+      k:=3;
+    for i:=(GeraltY div 50)+1 to (GeraltY div 50)+1+k do begin
+      if Location.Block[i,j]=2 then begin
+        Result:=False;
+        Form1.Timer1.Enabled:=False;
+        LavaTouch;
+        Exit;
+      end;
+      if Location.Block[i,j]=1 then begin
+        Result:=False;
+        Exit;
+      end;
+    end;
+  end;
+end;
+
+////////////////////////////////////////////////////////////////////////////////
+
+function JumpPossible:Boolean;
+var
+  i,j:integer;
+begin
+  Result:=True;
+  if GeraltY-GeraltJump<0 then begin
+    Jump:=False;
+    Result:=False;
+    Exit;
+  end;
+  if JumpStart-GeraltY>JumpHeight then begin
+    Jump:=False;
+    Result:=False;
+    Exit;
+  end;
+  if ((GeraltY-GeraltJump) mod 50)=45 then begin
+    i:=((GeraltY-GeraltJump) div 50)+1;
+    j:=(GeraltX div 50)+1;
+    if GeraltX mod 50=0 then begin
+      if Location.Block[i,j]=1 then begin
+        Jump:=False;
+        Result:=False;
+        Exit;
+      end;
+    end else begin
+      if (Location.Block[i,j]=1) or (Location.Block[i,j+1]=1) then begin
+        Jump:=False;
+        Result:=False;
+        Exit;
+      end;
+    end;
+  end;
+end;
+
+
+procedure LandingPossible;
+var
+  i,j:integer;
+begin
+  if GeraltY+150+GeraltJump>500 then begin
+    Landing:=False;
+    Exit;
+  end;
+  if ((GeraltY+150+GeraltJump) mod 50)=5 then begin
+    i:=((GeraltY+150+GeraltJump) div 50)+1;
+    j:=(GeraltX div 50)+1;
+    if GeraltX mod 50=0 then begin
+      if Location.Block[i,j]=2 then begin
+        Landing:=False;
+        Form1.Timer1.Enabled:=False;
+        LavaTouch;
+        Exit;
+      end;
+      if Location.Block[i,j]=0 then begin
+        GeraltY:=GeraltY+GeraltJump;
+        Landing:=True;
+        Exit;
+      end;
+    end else begin
+      if ((Location.Block[i,j]=2) and (Location.Block[i,j+1]=2)) or
+      ((Location.Block[i,j]=2) and (Location.Block[i,j+1]=0)) or
+      ((Location.Block[i,j]=0) and (Location.Block[i,j+1]=2)) then begin
+        Landing:=False;
+        Form1.Timer1.Enabled:=False;
+        LavaTouch;
+        Exit;
+      end;
+      if (Location.Block[i,j]=0) and (Location.Block[i,j+1]=0) then begin
+        GeraltY:=GeraltY+GeraltJump;
+        Landing:=True;
+        Exit;
+      end;
+    end;
+  end else begin
+    GeraltY:=GeraltY+GeraltJump;
+    Landing:=True;
+    Exit;
+  end;
+  Landing:=False;
+end;
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+procedure TForm1.Timer1Timer(Sender: TObject);
+begin
+  DrawLocation;
+  Buffer.Canvas.Draw(GeraltX,GeraltY,Geralt);
+  Canvas.Draw(0,0,Buffer);
+
+  if (LeftMove) and (LeftMovePossible) then
+    GeraltX:=GeraltX-GeraltMove;
+  if (RightMove) and (RightMovePossible) then
+    GeraltX:=GeraltX+GeraltMove;
+
+  if (Jump) and (JumpPossible) then
+    GeraltY:=GeraltY-GeraltJump;
+
+  if Jump=False then
+    LandingPossible;
+  if (Jump=False) and (Landing=False) then
+    JumpStart:=GeraltY;
+end;
+
+
+
+
+procedure TForm1.FormKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if Key=VK_LEFT then
+    LeftMove:=True;
+  if Key=VK_RIGHT then
+    RightMove:=True;
+  if (Jump=False) and (Landing=False) and (Key=VK_UP) then begin
+    JumpStart:=GeraltY;
+    Jump:=True;
+  end;
+end;
+
+
+
+procedure TForm1.FormKeyUp(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if Key=VK_LEFT then
+    LeftMove:=False;
+  if Key=VK_RIGHT then
+    RightMove:=False;
+end;
+
+end.

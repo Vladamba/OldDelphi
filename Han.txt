@@ -1,0 +1,74 @@
+program Project2;
+
+{$APPTYPE CONSOLE}
+
+uses
+  SysUtils;
+type
+  tmas=array of integer;
+var
+  num,i:integer;
+  rod1,rod2,rod3:tmas;
+
+procedure prnt(r1,r2,r3:tmas);
+  var
+    i:integer;
+  begin
+    writeln;
+    write('1 rod: ');
+    for i:=0 to high(r1) do
+      write(r1[i],'-');
+    writeln('|');
+    write('2 rod: ');
+    for i:=0 to high(r2) do
+      write(r2[i],'-');
+    writeln('|');
+    write('3 rod: ');
+    for i:=0 to high(r3) do
+      write(r3[i],'-');
+    writeln('|');
+  end;
+
+procedure han(var r1,r2,r3,r11,r22,r33:tmas; n:integer; var f:integer);
+  var
+    i,j:integer;
+  begin
+    if n<>0 then begin
+      han(r1,r3,r2,r11,r22,r33,n-1,f);
+      i:=0;
+      while (i<high(r1)) and (r1[i]=0) do
+        i:=i+1;
+      j:=high(r2);
+      while (j>=0) and (r2[j]<>0) do
+        j:=j-1;
+      r2[j]:=r1[i];
+      r1[i]:=0;
+      prnt(r11,r22,r33);
+      f:=f+1;
+      han(r3,r2,r1,r11,r22,r33,n-1,f);
+    end;
+  end;
+
+begin
+  write('Input the number of disks: ');
+  readln(num);
+  while num<1 do begin
+    write('Impossible! Try again:');
+    readln(num);
+  end;
+  setlength(rod1,num);
+  setlength(rod2,num);
+  setlength(rod3,num);
+  for i:=0 to num-1 do
+    rod1[i]:=i+1;
+  for i:=0 to num-1 do
+    rod2[i]:=0;
+  for i:=0 to num-1 do
+    rod3[i]:=0;
+  prnt(rod1,rod2,rod3);
+  i:=0;
+  han(rod1,rod2,rod3,rod1,rod2,rod3,num,i);
+  writeln;
+  write('Moves: ',i);
+  readln;
+end.

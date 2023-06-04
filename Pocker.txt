@@ -1,0 +1,250 @@
+program ProjectPoker;
+
+{$APPTYPE CONSOLE}
+
+uses
+  SysUtils;
+type
+  tplayer=array [1..5] of integer;
+var
+  player1,player2,sort1,sort2:tplayer;
+  value1,value2,hand1,hand2:integer;
+  rpt:string[2];
+
+procedure rnd1(var pl:tplayer);
+  var
+    i:integer;
+  begin
+    for i:=1 to 5 do
+      pl[i]:=random(6)+1;
+  end;
+
+procedure rnd2(var pl:tplayer);
+  var
+    i:integer;
+    s:string[2];
+  begin
+    writeln;
+    for i:=1 to 5 do begin
+      write('Re-roll ',i,' dice? ');
+      readln(s);
+      while (s<>'1') and (s<>'0') do begin
+        write('Incorrect input! Try again: ');
+        readln(s);
+      end;
+      if s='1' then
+        pl[i]:=random(6)+1;
+    end;
+  end;
+
+function five(pl:tplayer):integer;
+  begin
+    if pl[1]=pl[5] then
+      result:=pl[1]
+    else
+      result:=0;
+  end;
+
+function four(pl:tplayer):integer;
+  begin
+    if (pl[2]=pl[4]) and ((pl[1]=pl[2]) or (pl[4]=pl[5])) then
+      result:=pl[2]
+    else
+      result:=0;
+  end;
+
+function full(pl:tplayer):integer;
+  begin
+    if (pl[1]=pl[2]) and (pl[4]=pl[5]) and ((pl[2]=pl[3]) or (pl[3]=pl[4])) then
+      result:=pl[1]+pl[5]
+    else
+      result:=0;
+  end;
+
+function sihi(pl:tplayer):integer;
+  begin
+    if (pl[1]=2) and (pl[2]=3) and (pl[3]=4) and (pl[4]=5) and (pl[5]=6) then
+      result:=1
+    else
+      result:=0;
+  end;
+
+function fihi(pl:tplayer):integer;
+  begin
+    if (pl[1]=1) and (pl[2]=2) and (pl[3]=3) and (pl[4]=4) and (pl[5]=5) then
+      result:=1
+    else
+      result:=0;
+  end;
+
+function thre(pl:tplayer):integer;
+  begin
+    if (pl[1]=pl[3]) or (pl[2]=pl[4]) or (pl[3]=pl[5]) then
+      result:=pl[3]
+    else
+      result:=0;
+  end;
+
+function twop(pl:tplayer):integer;
+  begin
+    if ((pl[1]=pl[2]) or (pl[2]=pl[3])) and ((pl[3]=pl[4]) or (pl[4]=pl[5])) then
+      result:=pl[2]+pl[4]
+    else
+      result:=0;
+  end;
+
+function pair(pl:tplayer):integer;
+  begin
+    if (pl[1]=pl[2]) or (pl[2]=pl[3]) then
+      result:=pl[2]
+    else
+      if (pl[3]=pl[4]) or (pl[4]=pl[5]) then
+        result:=pl[4]
+      else
+        result:=0;
+  end;
+
+procedure rslt(pl:tplayer; var v,h:integer);
+  begin
+    while (v=0) and (h>0) do begin
+      h:=h-1;
+      case h of
+        1: v:=pair(pl);
+        2: v:=twop(pl);
+        3: v:=thre(pl);
+        4: v:=fihi(pl);
+        5: v:=sihi(pl);
+        6: v:=full(pl);
+        7: v:=four(pl);
+        8: v:=five(pl);
+      end;
+    end;
+    case h of
+      0: writeln('Nothing');
+      1: writeln('Pair');
+      2: writeln('Two Pairs');
+      3: writeln('Three-of-a-kind');
+      4: writeln('Five High Straight');
+      5: writeln('Six High Straight');
+      6: writeln('Full House');
+      7: writeln('Four-of-a-kind');
+      8: writeln('Five-of-a-kind');
+    end;
+    writeln;
+  end;
+
+function prnt(pl:tplayer):tplayer;
+  var
+    i,j,k:integer;
+  begin
+    writeln(' ___   ___   ___   ___   ___');
+    for i:=1 to 5 do
+      case pl[i] of
+        1: write('|   | ');
+        2: write('|*  | ');
+        3: write('|*  | ');
+        4: write('|* *| ');
+        5: write('|* *| ');
+        6: write('|***| ');
+      end;
+    writeln;
+    for i:=1 to 5 do
+      case pl[i] of
+        1: write('| * | ');
+        2: write('|   | ');
+        3: write('| * | ');
+        4: write('|   | ');
+        5: write('| * | ');
+        6: write('|   | ');
+      end;
+    writeln;
+    for i:=1 to 5 do
+      case pl[i] of
+        1: write('|   | ');
+        2: write('|  *| ');
+        3: write('|  *| ');
+        4: write('|* *| ');
+        5: write('|* *| ');
+        6: write('|***| ');
+      end;
+    writeln;
+    writeln;
+
+    for i:=2 to 5 do begin
+      k:=pl[i];
+      j:=i;
+      while (j>1) and (pl[j-1]>k) do begin
+        pl[j]:=pl[j-1];
+        j:=j-1;
+      end;
+      pl[j]:=k;
+    end;
+    result:=pl;
+  end;
+
+begin
+  randomize;
+  writeln('       WELCOME TO POKER!');
+  rpt:='1';
+  
+  while rpt='1' do begin
+
+  readln;
+  writeln('           Player 1');
+  rnd1(player1);
+  sort1:=prnt(player1);
+  value1:=0;
+  hand1:=9;
+  rslt(sort1,value1,hand1);
+
+  readln;
+  writeln('           Player 2');
+  rnd1(player2);
+  sort2:=prnt(player2);
+  value2:=0;
+  hand2:=9;
+  rslt(sort2,value2,hand2);
+
+  readln;
+  writeln('           Player 1');
+  rnd2(player1);
+  sort1:=prnt(player1);
+  value1:=0;
+  hand1:=9;
+  rslt(sort1,value1,hand1);
+
+  readln;
+  writeln('           Player 2');
+  rnd2(player2);
+  sort2:=prnt(player2);
+  value2:=0;
+  hand2:=9;
+  rslt(sort2,value2,hand2);
+
+  readln;
+  if hand1=hand2 then
+    if value1=value2 then
+        writeln('             DRAW')
+    else
+      if value1>value2 then
+        writeln('        PLAYER 1 WINS')
+      else
+        writeln('        PLAYER 2 WINS')
+  else
+    if hand1>hand2 then
+      writeln('        PLAYER 1 WINS')
+    else
+      writeln('        PLAYER 2 WINS');
+
+  writeln;
+  writeln;
+  write('Wanna play again? ');
+  readln(rpt);
+  while (rpt<>'1') and (rpt<>'0') do begin
+    write('Incorrect input! Try again: ');
+    readln(rpt);
+  end;
+  writeln;
+  writeln('           NEW GAME');
+end;
+end.

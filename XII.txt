@@ -1,0 +1,127 @@
+program Project72;
+
+{$APPTYPE CONSOLE}
+
+uses
+  SysUtils;
+const
+n=50;
+type
+trim=array [1..27] of string;
+tara=array [1..27] of integer;
+var
+s,s1:string[n];
+i,chi:integer;
+chislo:boolean;
+rim:trim;
+ara:tara;
+begin
+
+writeln('Vvedite tekst');
+readln(s);
+
+
+i:=1;
+while i<=length(s) do
+  if s[i]=' ' then
+    delete(s,i,1)
+  else
+  i:=i+1;
+
+chislo:=true;
+i:=1;
+while (i<=length(s)) and (chislo) do begin
+  if (s[i]<>'I') and (s[i]<>'V') and (s[i]<>'X') and (s[i]<>'L') and
+  (s[i]<>'C') and (s[i]<>'B') and (s[i]<>'M') then
+    chislo:=false;
+  i:=i+1;
+end;
+
+
+if (chislo) and (length(s)>0) then begin
+  rim[1]:='I';
+  rim[2]:='II';
+  rim[3]:='III';
+  rim[4]:='IV';
+  rim[5]:='V';
+  rim[6]:='VI';
+  rim[7]:='VII';
+  rim[8]:='VIII';
+  rim[9]:='IX';
+  rim[10]:='X';
+  rim[11]:='XX';
+  rim[12]:='XXX';
+  rim[13]:='XL';
+  rim[14]:='L';
+  rim[15]:='LX';
+  rim[16]:='LXX';
+  rim[17]:='LXXX';
+  rim[18]:='XC';
+  rim[19]:='C';
+  rim[20]:='CC';
+  rim[21]:='CCC';
+  rim[22]:='CB';
+  rim[23]:='B';
+  rim[24]:='BC';
+  rim[25]:='BCC';
+  rim[26]:='BCCC';
+  rim[27]:='CM';
+
+  ara[1]:=1;
+  ara[2]:=2;
+  ara[3]:=3;
+  ara[4]:=4;
+  ara[5]:=5;
+  ara[6]:=6;
+  ara[7]:=7;
+  ara[8]:=8;
+  ara[9]:=9;
+  ara[10]:=10;
+  ara[11]:=20;
+  ara[12]:=30;
+  ara[13]:=40;
+  ara[14]:=50;
+  ara[15]:=60;
+  ara[16]:=70;
+  ara[17]:=80;
+  ara[18]:=90;
+  ara[19]:=100;
+  ara[20]:=200;
+  ara[21]:=300;
+  ara[22]:=400;
+  ara[23]:=500;
+  ara[24]:=600;
+  ara[25]:=700;
+  ara[26]:=800;
+  ara[27]:=900;
+
+  chi:=0;
+  i:=27;
+  while (i>0) and (chislo) do begin
+    s1:=copy(s,1,length(rim[i]));
+    if s1=rim[i] then begin
+      chi:=chi+ara[i];
+      delete(s,1,length(rim[i]));
+      case i of
+        20..27:
+          i:=19;
+        11..18:
+          i:=10;
+        1..9:
+          i:=0;
+      end;
+    end;
+    i:=i-1;
+  end;
+  
+if length(s)>0 then
+  chislo:=false
+else
+  writeln(chi);
+end;
+
+if not chislo then
+  writeln('Tekst ne yavlaetsa pravilnoy zapisyu tselogo chisla ot 1 do 999 rimskimi tsiframi');
+
+readln;
+end.
